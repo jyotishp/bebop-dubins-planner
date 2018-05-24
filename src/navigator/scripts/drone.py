@@ -6,18 +6,16 @@ import math
 import rospy
 from geometry_msgs.msg import Twist
 
-class Bebop(object):
+class Bebop2(object):
 	"""docstring for [object Object]."""
 	def __init__(self,
 				 forward_speed,
-				 max_tilt_angle,
 				 yaw_cmd_value,
 				 angular_speed,
 				 vel_cmd_pub,
 		 		 dubin_omega,
 				 ):
 		self.forward_speed = forward_speed
-		self.max_tilt_angle = max_tilt_angle
 		self.yaw_cmd_value = math.pi/6
 		self.angular_speed = angular_speed
 		self.vel_cmd_pub = vel_cmd_pub

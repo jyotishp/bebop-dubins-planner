@@ -30,7 +30,12 @@ def main(args):
 	vel_cmd_pub = rospy.Publisher('/vservo/cmd_vel', Twist, queue_size=3)
 
 	# Load drone model
-	# drone = Bebop2()
+	drone = Bebop2(
+					forward_speed = 1,
+					yaw_cmd_value = 0,
+					angular_speed = 0,
+					vel_cmd_pub = vel_cmd_pub,
+					dubin_omega = 1)
 
 	# Planner parameters (All in meters)
 	planner = Planner(
