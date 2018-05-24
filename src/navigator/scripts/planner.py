@@ -12,6 +12,7 @@ import cv2
 # Import ROS modeules
 from sensor_msgs.msg import Image, CameraInfo
 from cv_bridge import CvBridge, CvBridgeError
+from tf.transformations import euler_from_quaternion
 
 # Import custom modules
 from dubins import dubins_path_planning
@@ -41,17 +42,25 @@ class DubinsPlanner():
 		self.next_waypoint = None
 		self.move = False
 		self.initialized = False
-		self.kill_thread = False
 
 	def resetSearch(self):
 		self.control_point = 0
 
 	# Callback for odometry
 	def updateOdomentry(self, odometry):
-		# I have no idea how odometry msg looks like
 		# Update the value of self.odometry
-		# self.odometry = {x, y, heading}
-		pass
+		quaternion = []
+		quaternion.append(odometry.pose.pose.orientation.x)
+		quaternion.append(odometry.pose.pose.orientation.y)
+		quaternion.append(odometry.pose.pose.orientation.z)
+		quaternion.append(odometry.pose.pose.orientation.w)
+		heading = euler_from_quaternion(quaternion)[0]
+
+		self.odometry = {
+			'x': odometry.pose.pose.position.x,
+			'y': odometry.pose.pose.position.y,
+			'heading': heading
+		}
 
 	# Plan dubins curve and move drone along it
 	def run(self):
@@ -66,18 +75,58 @@ class DubinsPlanner():
 				eyaw = goal[2],
 				c = 1
 				)
+			self.last_plan = time.time()
 			self.move = True
 			self.initialized = True
 		while self.move:
-			if goalReached():
+			if self.goalReached():
 				self.move = False
 				self.kill_thread = True
 			if self.next_waypoint:
 				# Plan a dubins curve
+				_, _, _, mode, _, pathlength = dubins_path_planning(
+					sx = self.odometry['x'],
+					sy = self.odometry['y'],
+					syaw = self.odometry['heading'],
+					ex = self.min_safe_distance,
+					ey = self.next_waypoint,
+					eyaw = self.odometry['heading'],
+					c = 1
+					)
+				self.last_plan = time.time()
 				# Kill previous moveDrone thread
+				self.drone.kill_thread = True
+				self.past_waypoint = self.next_waypoint
+				self.next_waypoint = None
 				# Start a new thread for moveDrone (use while self.kill)
-				# Limit the loop rate
+				self.drone.thread.join()
+				self.drone.thread = threading.Thread(target = self.drone.dubinsMoveDrone, args = [mode, pathlength])
+				self.drone.thread.start()
 			# Replan to goal if waypoint reached
+			if self.drone.done or (time.time() - self.last_plan) > 2:
+				# Replan
+				_, _, _, mode, _, pathlength = dubins_path_planning(
+					sx = self.odometry['x'],
+					sy = self.odometry['y'],
+					syaw = self.odometry['heading'],
+					ex = self.goal[0],
+					ey = self.goal[1],
+					eyaw = self.goal[2],
+					c = 1
+					)
+				self.last_plan = time.time()
+				# Kill previous moveDrone thread
+				self.drone.kill_thread = True
+				self.past_waypoint = self.next_waypoint
+				self.next_waypoint = None
+				# Start a new thread for moveDrone (use while self.kill)
+				self.drone.thread.join()
+				self.drone.thread = threading.Thread(target = self.drone.dubinsMoveDrone, args = [mode, pathlength])
+				self.drone.thread.start()
+
+			# Limit the loop rate
+			time.sleep(1/10)
+
 		print('Reached Goal!')
 
 	# Check if the goal is reached

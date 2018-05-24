@@ -38,13 +38,14 @@ def main(args):
 		window_size = (0.5, 0.5), # (x, y)
 		grid_size = (6, 6), # (x, y)
 		obstacle_radius = 0.5,
-		goal = (10, 0), # (x, y)
+		goal = (10, 0, 0), # (x, y)
 		error_margin = 0.05,
 		drone = drone
 		)
 
 	# Thread to run the planner
 	planner_thread = threading.Thread(target = planner.run)
+	planner_thread.start()
 
 	try:
 		rospy.spin()
