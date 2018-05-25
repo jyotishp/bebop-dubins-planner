@@ -37,17 +37,19 @@ class DubinsPlanner():
 		self.goal = goal
 		self.error_margin = error_margin
 		self.drone = drone
-		self.grid = Grid(grid_size, obstacle_radius)
+		self.window_size = window_size
+		self.grid = Grid(np.array(grid_size), obstacle_radius, min_safe_distance)
 		self.control_point = 0
 		self.next_waypoint = None
 		self.move = False
 		self.initialized = False
+		self.odometry = None
 
 	def resetSearch(self):
 		self.control_point = 0
 
 	# Callback for odometry
-	def updateOdomentry(self, odometry):
+	def updateOdometry(self, odometry):
 		# Update the value of self.odometry
 		quaternion = []
 		quaternion.append(odometry.pose.pose.orientation.x)
@@ -70,9 +72,9 @@ class DubinsPlanner():
 				sx = 0,
 				sy = 0,
 				syaw = 0,
-				ex = goal[0],
-				ey = goal[1],
-				eyaw = goal[2],
+				ex = self.goal[0],
+				ey = self.goal[1],
+				eyaw = self.goal[2],
 				c = 1
 				)
 			self.last_plan = time.time()
@@ -81,7 +83,7 @@ class DubinsPlanner():
 		while self.move:
 			if self.goalReached():
 				self.move = False
-				self.kill_thread = True
+				self.drone.kill_thread = True
 			if self.next_waypoint:
 				# Plan a dubins curve
 				_, _, _, mode, _, pathlength = dubins_path_planning(
@@ -96,10 +98,13 @@ class DubinsPlanner():
 				self.last_plan = time.time()
 				# Kill previous moveDrone thread
 				self.drone.kill_thread = True
-				self.past_waypoint = self.next_waypoint
 				self.next_waypoint = None
 				# Start a new thread for moveDrone (use while self.kill)
-				self.drone.thread.join()
+				try:
+					self.drone.thread.join()
+				except:
+					pass
+				self.drone.kill_thread = False
 				self.drone.thread = threading.Thread(target = self.drone.dubinsMoveDrone, args = [mode, pathlength])
 				self.drone.thread.start()
 			# Replan to goal if waypoint reached
@@ -117,15 +122,18 @@ class DubinsPlanner():
 				self.last_plan = time.time()
 				# Kill previous moveDrone thread
 				self.drone.kill_thread = True
-				self.past_waypoint = self.next_waypoint
 				self.next_waypoint = None
 				# Start a new thread for moveDrone (use while self.kill)
-				self.drone.thread.join()
+				try:
+					self.drone.thread.join()
+				except:
+					pass
+				self.drone.kill_thread = False
 				self.drone.thread = threading.Thread(target = self.drone.dubinsMoveDrone, args = [mode, pathlength])
 				self.drone.thread.start()
 
 			# Limit the loop rate
-			time.sleep(1/10)
+			time.sleep(1/1)
 
 		print('Reached Goal!')
 
@@ -133,16 +141,18 @@ class DubinsPlanner():
 	def goalReached(self):
 		margin_x = self.goal[0] * self.error_margin
 		margin_y = self.goal[1] * self.error_margin
-		if abs(self.goal[0] - self.odometry['x']) < margin_x 
-		and abs(self.goal[1] - self.odometry['y']) < margin_y:
+		if abs(self.goal[0] - self.odometry['x']) < margin_x and abs(self.goal[1] - self.odometry['y']) < margin_y:
 			return True
 
 	# Callback for apriltags subscriber
 	def detectAprilTags(self, tags):
 		# Put all tags on a grid
-		self.grid.pupulate(tags)
+		self.grid.populate(tags.detections)
 		# Detect free space and Set self.next_waypoint
-		self.next_waypoint = self.getWaypoint()
+		try:
+			self.next_waypoint = self.getWaypoint()
+		except:
+			pass
 		# Reset the grid
 		self.grid.reset()
 
@@ -169,13 +179,13 @@ class DubinsPlanner():
 
 	# This is bad. Refactor!
 	def crop(self):
-		return self.grid.grid[self.grid.origin['y'] - round(self.window_size*10):self.grid.origin['y'] - round(self.window_size*10), self.grid.origin['x'] - self.control_point - round(self.window_size*10):self.grid.origin['x'] - self.control_point + round(self.window_size*10)], self.grid.grid[self.grid.origin['y'] - round(self.window_size*10):self.grid.origin['y'] - round(self.window_size*10), self.grid.origin['x'] + self.control_point - round(self.window_size*10):self.grid.origin['x'] + self.control_point + round(self.window_size*10)]
-
+		return self.grid.grid[int(self.grid.origin['y'] - round(self.window_size*10)):int(self.grid.origin['y'] - round(self.window_size*10)), int(self.grid.origin['x'] - float(self.control_point) - round(self.window_size*10)):int(self.grid.origin['x'] - float(self.control_point) + round(self.window_size*10))], self.grid.grid[int(self.grid.origin['y'] - round(self.window_size*10)):int(self.grid.origin['y'] - round(self.window_size*10)), int(self.grid.origin['x'] + float(self.control_point) - round(self.window_size*10)):int(self.grid.origin['x'] + float(self.control_point) + round(self.window_size*10))]
 
 class Grid(object):
-	def __init__(self, grid_size, obstacle_radius):
+	def __init__(self, grid_size, obstacle_radius, min_safe_distance):
 		self.obstacle_radius = obstacle_radius
 		self.size = grid_size
+		self.min_safe_distance = min_safe_distance
 		self.origin = {
 			'x': round(grid_size[0]/2),
 			'y': round(grid_size[1]/2)
@@ -187,9 +197,10 @@ class Grid(object):
 
 	def populate(self, tags):
 		for tag in tags:
-			x = round(tag.pose.pose.position.x*10) + self.origin['x']
-			y = round(tag.pose.pose.position.y*10) + self.origin['y']
-			try:
-				self.grid[y-self.obstacle_radius:y+self.obstacle_radius, x-self.obstacle_radius:x+self.obstacle_radius] = 1
-			except Exception as e:
-				print('Obstacle omitted dues to padding.')
+			if tag.pose.pose.position.z < self.min_safe_distance :
+				x = round(tag.pose.pose.position.x*10) + self.origin['x']
+				y = round(tag.pose.pose.position.y*10) + self.origin['y']
+				try:
+					self.grid[y-self.obstacle_radius:y+self.obstacle_radius, x-self.obstacle_radius:x+self.obstacle_radius] = 1
+				except Exception as e:
+					print('Obstacle omitted dues to padding.')

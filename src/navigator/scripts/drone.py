@@ -81,21 +81,22 @@ class Bebop2(object):
 		time[2] = pathlength[2]/self.dubin_omega;
 		i = 0
 		start_time = rospy.Time.now().to_sec()
-			while( rospy.Time.now().to_sec() - start_time < 10 and not self.kill_thread):
-					self.vel_cmd_pub.publish(vel_msg)
+		# while( rospy.Time.now().to_sec() - start_time < 10 and not self.kill_thread):
+		# 	self.vel_cmd_pub.publish(vel_msg)
 		for modes in mode:
 			if modes == 'R':
-			direction = -1
+				direction = -1
 			elif modes == 'S': 
-			direction = 0
+				direction = 0
 			else:
-			direction = 1
+				direction = 1
 
-			vel_msg.angular.z = self.dubin_omega* direction
-			
-			start_time = rospy.Time.now().to_sec()
-				while( rospy.Time.now().to_sec() - start_time < time[i] and not self.kill_thread):
-					self.vel_cmd_pub.publish(vel_msg)
-			i = i + 1
+		vel_msg.angular.z = self.dubin_omega* direction
+		
+		start_time = rospy.Time.now().to_sec()
+		print(self.kill_thread)
+		while( rospy.Time.now().to_sec() - start_time < time[i] and not self.kill_thread):
+			self.vel_cmd_pub.publish(vel_msg)
+		i = i + 1
 
 		self.done = True

@@ -2,7 +2,7 @@
 
 # Load system modules
 from __future__ import print_function
-import sys, math, threading
+import sys, math, threading, time
 
 # Load ROS modules
 import roslib, rospy
@@ -22,18 +22,14 @@ def main(args):
 	# Intiate the ROS node
 	rospy.init_node('navigator', anonymous=True)
 	
-	# Subscribe to required topics
-	tag_sub = rospy.Subscriber('/tag_detections', AprilTagDetectionArray, planner.detectAprilTags)
-	odometry_sub = rospy.Subscriber('/bebop/odom', Odometry, planner.updateOdometry)
-	
 	# Drone control topics
 	vel_cmd_pub = rospy.Publisher('/vservo/cmd_vel', Twist, queue_size=3)
-
+	
 	# Load drone model
-	drone = Bebop2(
+	drone = Drone(
 					forward_speed = 1,
-					yaw_cmd_value = 0,
-					angular_speed = 0,
+					yaw_cmd_value = 1,
+					angular_speed = 1,
 					vel_cmd_pub = vel_cmd_pub,
 					dubin_omega = 1)
 
@@ -48,7 +44,13 @@ def main(args):
 		drone = drone
 		)
 
+	# Subscribe to required topics
+	tag_sub = rospy.Subscriber('/tag_detections', AprilTagDetectionArray, planner.detectAprilTags)
+	odometry_sub = rospy.Subscriber('/bebop/odom', Odometry, planner.updateOdometry)
+
 	# Thread to run the planner
+	print('Starting planner in 5 seconds...')
+	time.sleep(5)
 	planner_thread = threading.Thread(target = planner.run)
 	planner_thread.start()
 
