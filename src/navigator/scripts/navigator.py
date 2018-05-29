@@ -37,10 +37,10 @@ def main(args):
 	planner = Planner(
 		min_safe_distance = 5,
 		window_size = (0.5, 0.5), # (x, y)
-		grid_size = (6, 6), # (x, y)
+		grid_size = (10, 10), # (x, y)
 		obstacle_radius = 0.5,
-		goal = (10, 0, 0), # (x, y)
-		error_margin = 0.05,
+		goal = (15, 15, math.pi/2), # (x, y, heading)
+		error_margin = 0.1,
 		drone = drone
 		)
 

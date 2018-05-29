@@ -91,12 +91,12 @@ class Bebop2(object):
 			else:
 				direction = 1
 
-		vel_msg.angular.z = self.dubin_omega* direction
-		
-		start_time = rospy.Time.now().to_sec()
-		print(self.kill_thread)
-		while( rospy.Time.now().to_sec() - start_time < time[i] and not self.kill_thread):
-			self.vel_cmd_pub.publish(vel_msg)
-		i = i + 1
+			vel_msg.angular.z = self.dubin_omega* direction
+			
+			start_time = rospy.Time.now().to_sec()
+			print(self.kill_thread)
+			while( rospy.Time.now().to_sec() - start_time < time[i] and not self.kill_thread and time[i] > 0.05):
+				self.vel_cmd_pub.publish(vel_msg)
+			i = i + 1
 
 		self.done = True

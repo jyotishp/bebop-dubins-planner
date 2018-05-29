@@ -177,7 +177,7 @@ def dubins_path_planning_from_origin(ex, ey, eyaw, c):
 	return px, py, pyaw, bmode, bcost, [bt, bp, bq]
 
 
-def dubins_path_planning(sy, sx, syaw, ex, ey, eyaw, c):
+def dubins_path_planning(sy, sx, syaw, ey, ex, eyaw, c):
 	"""
 	Dubins path plannner
 
@@ -198,7 +198,10 @@ def dubins_path_planning(sy, sx, syaw, ex, ey, eyaw, c):
 
 	"""
 
-	sy *= -1
+	sx *= -1
+	ex *= -1
+	syaw += math.pi/2
+	eyaw += math.pi/2
 	ex = ex - sx
 	ey = ey - sy
 
