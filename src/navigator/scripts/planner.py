@@ -12,6 +12,7 @@ import cv2
 
 # Import ROS modeules
 from sensor_msgs.msg import Image, CameraInfo
+from std_msgs.msg import Empty
 from cv_bridge import CvBridge, CvBridgeError
 from tf.transformations import euler_from_quaternion
 
@@ -32,13 +33,15 @@ class DubinsPlanner():
 				obstacle_radius,
 				goal,
 				error_margin,
-				drone
+				drone,
+				land
 				):
 		self.min_safe_distance = min_safe_distance
 		self.goal = goal
 		self.error_margin = error_margin
 		self.drone = drone
 		self.window_size = window_size
+		self.land = land
 		self.grid = Grid(np.array(grid_size), obstacle_radius, min_safe_distance)
 		self.control_point = 0
 		self.next_waypoint = None
@@ -122,7 +125,7 @@ class DubinsPlanner():
 				self.drone.kill_thread = False
 				self.drone.thread = threading.Thread(target = self.drone.dubinsMoveDrone, args = [mode, pathlength])
 				self.drone.thread.start()
-				time.sleep(sum(pathlength)-0.2)
+				time.sleep(0.8)
 			# Replan to goal if waypoint reached
 			if self.drone.done or (time.time() - self.last_plan) > 2:
 				print('Replanning')
@@ -148,14 +151,16 @@ class DubinsPlanner():
 				self.drone.thread.start()
 
 			# Limit the loop rate
-			time.sleep(1/5)
+			time.sleep(1/10)
 
 		print('Reached Goal!')
+		time.sleep(1)
+		self.land.publish(Empty())
 
 	# Check if the goal is reached
 	def goalReached(self):
-		margin_x = 3 #self.goal[0] * self.error_margin
-		margin_y = 3 #self.goal[1] * self.error_margin
+		margin_x = 1 #self.goal[0] * self.error_margin
+		margin_y = 1 #self.goal[1] * self.error_margin
 		reached_x = abs(self.goal[0] - self.odometry['x']) < margin_x
 		reached_y = abs(self.goal[1] - self.odometry['y']) < margin_y
 		reached_heading = abs(self.goal[2] - self.odometry['heading']) < math.pi/12
@@ -201,7 +206,7 @@ class DubinsPlanner():
 			else:
 				self.control_point *= 1 if obstacles_left > 0 else -1
 				if self.control_point:
-					self.control_point += 15 if obstacles_left > 0 else -15
+					self.control_point += 20 if obstacles_left > 0 else -20
 					return self.control_point/10
 				else:
 					return None

@@ -7,7 +7,7 @@ import sys, math, threading, time
 # Load ROS modules
 import roslib, rospy
 roslib.load_manifest('navigator')
-from std_msgs.msg import String
+from std_msgs.msg import String, Empty
 from sensor_msgs.msg import Image, CameraInfo
 from geometry_msgs.msg import Twist
 from nav_msgs.msg import Odometry
@@ -24,6 +24,7 @@ def main(args):
 	
 	# Drone control topics
 	vel_cmd_pub = rospy.Publisher('/vservo/cmd_vel', Twist, queue_size=3)
+	land = rospy.Publisher('/bebop/land', Empty, queue_size=3)
 	
 	# Load drone model
 	drone = Drone(
@@ -35,13 +36,14 @@ def main(args):
 
 	# Planner parameters (All in meters)
 	planner = Planner(
-		min_safe_distance = 5,
+		min_safe_distance = 8,
 		window_size = (0.5, 0.5), # (x, y)
 		grid_size = (10, 10), # (x, y)
 		obstacle_radius = 0.5,
-		goal = (15, 15, math.pi/2), # (x, y, heading)
+		goal = (20, 0, 0), # (x, y, heading)
 		error_margin = 0.1,
-		drone = drone
+		drone = drone,
+		land = land
 		)
 
 	# Subscribe to required topics
