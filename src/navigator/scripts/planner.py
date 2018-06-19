@@ -91,13 +91,13 @@ class DubinsPlanner():
 				ey = self.goal[0],
 				ex = self.goal[1],
 				eyaw = self.goal[2],
-				c = 1
+				 	c = 1
 				)
 			self.last_plan = time.time()
 			self.move = True
 			self.initialized = True
 			print('Initialized')
-			self.drone.thread = threading.Thread(target = self.drone.dubinsMoveDrone, args = [mode, pathlength])
+			self.drone.thread = threading.Thread(target = self.drone.dubinsMoveDrone, args = [mode, pathlength, 1])
 			self.drone.thread.start()
 		while self.move:
 			if self.goalReached():
@@ -106,13 +106,31 @@ class DubinsPlanner():
 			if self.next_waypoint:
 				print('Replanning on next waypoint')
 				# Plan a dubins curve
+				#nextwayx = math.cos(self.odometry['heading'])*self.min_safe_distance + math.sin(self.odometry['heading'])*(self.next_waypoint) + self.odometry['x']
+				#nextwayy = -math.sin(self.odometry['heading'])*self.min_safe_distance + math.cos(self.odometry['heading'])*(self.next_waypoint) + self.odometry['y']
+				#print('Printingggg start: ', self.odometry['x'], self.odometry['y'])
+				#print('Printingggg end: ', nextwayx, nextwayy)				
+				#_, _, _, mode, _, pathlength = dubins_path_planning(
+				#	sy = self.odometry['x'],
+				#	sx = self.odometry['y'],
+				#	syaw = self.odometry['heading'],
+				#	ey = nextwayx,
+				#	ex = nextwayy,
+				#	eyaw = self.odometry['heading'],
+				#	c = 1
+				#	)
+				
+				# print('Printingggg (nextwayx:',self.min_safe_distance,', nextwayy:',self.next_waypoint,')' )
+				print('Next Waypoint:', end='')				
+				print((self.min_safe_distance,self.next_waypoint))				
+	
 				_, _, _, mode, _, pathlength = dubins_path_planning(
-					sy = self.odometry['x'],
-					sx = self.odometry['y'],
-					syaw = self.odometry['heading'],
+					sy = 0,
+					sx = 0,
+					syaw = 0,
 					ey = self.min_safe_distance,
 					ex = self.next_waypoint,
-					eyaw = self.odometry['heading'],
+					eyaw = 0,
 					c = 1
 					)
 				self.last_plan = time.time() + 10
@@ -123,12 +141,13 @@ class DubinsPlanner():
 				self.drone.thread.join()
 				self.drone.done = False
 				self.drone.kill_thread = False
-				self.drone.thread = threading.Thread(target = self.drone.dubinsMoveDrone, args = [mode, pathlength])
+				self.drone.thread = threading.Thread(target = self.drone.dubinsMoveDrone, args = [mode, pathlength, 1])
 				self.drone.thread.start()
-				time.sleep(0.8)
+				time.sleep(2)
 			# Replan to goal if waypoint reached
 			if self.drone.done or (time.time() - self.last_plan) > 2:
 				print('Replanning')
+				#roc = 1
 				# Replan
 				_, _, _, mode, _, pathlength = dubins_path_planning(
 					sy = self.odometry['x'],
@@ -137,7 +156,7 @@ class DubinsPlanner():
 					ey = self.goal[0],
 					ex = self.goal[1],
 					eyaw = self.goal[2],
-					c = 1
+					c = 0.5
 					)
 				self.last_plan = time.time()
 				# Kill previous moveDrone thread
@@ -147,7 +166,7 @@ class DubinsPlanner():
 				self.drone.thread.join()
 				self.drone.kill_thread = False
 				self.drone.done = False
-				self.drone.thread = threading.Thread(target = self.drone.dubinsMoveDrone, args = [mode, pathlength])
+				self.drone.thread = threading.Thread(target = self.drone.dubinsMoveDrone, args = [mode, pathlength, 0.5])
 				self.drone.thread.start()
 
 			# Limit the loop rate
@@ -204,9 +223,9 @@ class DubinsPlanner():
 				self.control_point += 1
 			# Return None if window was not moved, else distance of waypoint in metres.
 			else:
-				self.control_point *= 1 if obstacles_left > 0 else -1
+				self.control_point *= -1 if obstacles_left > 0 else 1
 				if self.control_point:
-					self.control_point += 20 if obstacles_left > 0 else -20
+					self.control_point += -20 if obstacles_left > 0 else 20
 					return self.control_point/10
 				else:
 					return None
@@ -247,7 +266,9 @@ class Grid(object):
 
 	def populate(self, tags):
 		for tag in tags:
+			
 			if tag.pose.pose.position.z < self.min_safe_distance :
+				print("Obstacle depth is: ", tag.pose.pose.position.z)			
 				x = round(tag.pose.pose.position.x*10) + self.origin['x']
 				y = round(tag.pose.pose.position.y*10) + self.origin['y']
 				# print('Origin:', self.origin, 'obstacle:', x/10,y/10)

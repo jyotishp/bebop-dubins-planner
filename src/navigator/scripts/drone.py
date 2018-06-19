@@ -65,9 +65,10 @@ class Bebop2(object):
 		print("Inside Wile loop")
 
 
-	def dubinsMoveDrone(self, mode, pathlength):
+	def dubinsMoveDrone(self, mode, pathlength, roc):
 		print(mode)
 		print(pathlength)
+		self.dubin_omega = roc
 		vel_msg = Twist()
 		vel_msg.linear.x = self.forward_speed
 		vel_msg.linear.y = 0
@@ -77,7 +78,7 @@ class Bebop2(object):
 		vel_msg.angular.z = 0
 		time = [1,1,1];
 		time[0] = pathlength[0]/self.dubin_omega;
-		time[1] = pathlength[1]/(self.forward_speed*1)
+		time[1] = pathlength[1]/(self.forward_speed*roc)
 		time[2] = pathlength[2]/self.dubin_omega;
 		i = 0
 		start_time = rospy.Time.now().to_sec()
