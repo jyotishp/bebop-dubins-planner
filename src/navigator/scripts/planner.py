@@ -32,23 +32,27 @@ class DubinsPlanner():
 				grid_size,
 				obstacle_radius,
 				goal,
+				next_goal,
 				error_margin,
 				drone,
 				land
 				):
 		self.min_safe_distance = min_safe_distance
 		self.goal = goal
+		self.next_goal = next_goal
 		self.error_margin = error_margin
 		self.drone = drone
 		self.window_size = window_size
 		self.land = land
 		self.grid = Grid(np.array(grid_size), obstacle_radius, min_safe_distance)
 		self.control_point = 0
+		self.count = 0
 		self.next_waypoint = None
 		self.move = False
 		self.initialized = False
 		self.odometry = None
 		self.initial_yaw = None
+		self.tag_detections = None
 
 	def resetSearch(self):
 		self.control_point = 0
@@ -106,8 +110,6 @@ class DubinsPlanner():
 			if self.next_waypoint:
 				print('Replanning on next waypoint')
 				# Plan a dubins curve
-				#nextwayx = math.cos(self.odometry['heading'])*self.min_safe_distance + math.sin(self.odometry['heading'])*(self.next_waypoint) + self.odometry['x']
-				#nextwayy = -math.sin(self.odometry['heading'])*self.min_safe_distance + math.cos(self.odometry['heading'])*(self.next_waypoint) + self.odometry['y']
 				#print('Printingggg start: ', self.odometry['x'], self.odometry['y'])
 				#print('Printingggg end: ', nextwayx, nextwayy)				
 				#_, _, _, mode, _, pathlength = dubins_path_planning(
@@ -121,6 +123,24 @@ class DubinsPlanner():
 				#	)
 				
 				# print('Printingggg (nextwayx:',self.min_safe_distance,', nextwayy:',self.next_waypoint,')' )
+				
+				for tag in self.tag_detections:
+					if tag.pose.pose.position.z < self.min_safe_distance:
+						obs_globalx = math.cos(self.odometry['heading'])*tag.pose.pose.position.z + self.odometry['x']
+						obs_globaly = math.sin(self.odometry['heading'])*tag.pose.pose.position.z + self.odometry['y']
+						print('Obs_X: ', obs_globalx, ' Obs_Y: ', obs_globaly)
+						# only for a single obstacle at goal
+						if(abs(obs_globalx - self.goal[0]) < 1.5 and abs(obs_globaly - self.goal[1]) < 1.5):
+							self.count+=1
+
+							if(self.count > 1):
+								print('Changing goal location!!!!')
+								self.goal = self.next_goal[0]
+								self.next_goal.pop(0)
+								self.count = 0
+
+							break
+				
 				print('Next Waypoint:', end='')				
 				print((self.min_safe_distance,self.next_waypoint))				
 	
@@ -143,7 +163,7 @@ class DubinsPlanner():
 				self.drone.kill_thread = False
 				self.drone.thread = threading.Thread(target = self.drone.dubinsMoveDrone, args = [mode, pathlength, 1])
 				self.drone.thread.start()
-				time.sleep(2)
+				time.sleep(5)
 			# Replan to goal if waypoint reached
 			if self.drone.done or (time.time() - self.last_plan) > 2:
 				print('Replanning')
@@ -178,8 +198,8 @@ class DubinsPlanner():
 
 	# Check if the goal is reached
 	def goalReached(self):
-		margin_x = 1 #self.goal[0] * self.error_margin
-		margin_y = 1 #self.goal[1] * self.error_margin
+		margin_x = 0.8 #self.goal[0] * self.error_margin
+		margin_y = 0.8 #self.goal[1] * self.error_margin
 		reached_x = abs(self.goal[0] - self.odometry['x']) < margin_x
 		reached_y = abs(self.goal[1] - self.odometry['y']) < margin_y
 		reached_heading = abs(self.goal[2] - self.odometry['heading']) < math.pi/12
@@ -193,6 +213,9 @@ class DubinsPlanner():
 		self.grid.populate(tags.detections)
 		# plt.imshow(self.grid.grid)
 		# plt.show()
+
+		self.tag_detections = tags.detections
+
 		cv2.namedWindow('Simulated Depth Map')
 		cv2.imshow('Simulated Depth Map',self.grid.grid.astype(int))
 		cv2.waitKey(1)
@@ -268,7 +291,7 @@ class Grid(object):
 		for tag in tags:
 			
 			if tag.pose.pose.position.z < self.min_safe_distance :
-				print("Obstacle depth is: ", tag.pose.pose.position.z)			
+				#print("Obstacle depth is: ", tag.pose.pose.position.z)			
 				x = round(tag.pose.pose.position.x*10) + self.origin['x']
 				y = round(tag.pose.pose.position.y*10) + self.origin['y']
 				# print('Origin:', self.origin, 'obstacle:', x/10,y/10)

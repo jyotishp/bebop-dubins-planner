@@ -40,7 +40,8 @@ def main(args):
 		window_size = (0.5, 0.5), # (x, y)
 		grid_size = (10, 10), # (x, y)
 		obstacle_radius = 0.5,
-		goal = (20, 10, math.pi/2), # (x, y, heading)
+		goal = (20, 0, 0), # (x, y, heading)
+		next_goal = [(15,5,math.pi/2),(20,5,0),(30,0,0)],
 		error_margin = 0.1,
 		drone = drone,
 		land = land
